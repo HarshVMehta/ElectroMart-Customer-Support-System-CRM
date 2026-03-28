@@ -1,0 +1,39 @@
+<template>
+    <div class="hero-container">
+        <div class="hero-content">
+            <h1 class="hero-title">Welcome to ElectroMart Support</h1>
+            <p class="hero-subtitle">Get help with your electronics - Quick solutions, Expert support</p>
+            
+            <div class="search-container">
+                <div class="search-wrapper">
+                    <lightning-icon 
+                        icon-name="utility:search" 
+                        alternative-text="Search" 
+                        size="small"
+                        class="search-icon">
+                    </lightning-icon>
+                    <input 
+                        type="text" 
+                        class="search-input"
+                        placeholder="Search for help articles, troubleshooting guides..."
+                        value={searchQuery}
+                        onkeyup={handleSearchInput}
+                        onkeypress={handleKeyPress}
+                    />
+                    <button class="search-button" onclick={handleSearch}>Search</button>
+                </div>
+            </div>
+
+            <div class="cta-section">
+                <p class="cta-text">Can't find what you're looking for?</p>
+                <button class="cta-button" onclick={navigateToSupport}>
+                    Get Support
+                </button>
+            </div>
+        </div>
+        
+        <div class="hero-background">
+            <div class="wave-animation"></div>
+        </div>
+    </div>
+</template>

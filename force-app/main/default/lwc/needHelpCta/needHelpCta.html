@@ -1,0 +1,74 @@
+<template>
+    <div class="cta-section">
+        <div class="cta-container">
+            <div class="cta-content">
+                <h2 class="cta-title">Still Need Help?</h2>
+                <p class="cta-description">
+                    Can't find what you're looking for? Our support team is here to help you 24/7
+                </p>
+                
+                <div class="cta-buttons">
+                    <button class="primary-button" onclick={navigateToSupport}>
+                        <lightning-icon 
+                            icon-name="utility:help" 
+                            alternative-text="Support" 
+                            size="small"
+                            class="button-icon">
+                        </lightning-icon>
+                        Get Support
+                    </button>
+                    
+                    <button class="secondary-button" onclick={startChat}>
+                        <lightning-icon 
+                            icon-name="utility:live_message" 
+                            alternative-text="Chat" 
+                            size="small"
+                            class="button-icon">
+                        </lightning-icon>
+                        Chat with Agent
+                    </button>
+                </div>
+
+                <div class="cta-features">
+                    <div class="feature-item">
+                        <lightning-icon 
+                            icon-name="utility:clock" 
+                            alternative-text="24/7" 
+                            size="x-small">
+                        </lightning-icon>
+                        <span>24/7 Support</span>
+                    </div>
+                    <div class="feature-item">
+                        <lightning-icon 
+                            icon-name="utility:answer" 
+                            alternative-text="Response" 
+                            size="x-small">
+                        </lightning-icon>
+                        <span>Quick Response</span>
+                    </div>
+                    <div class="feature-item">
+                        <lightning-icon 
+                            icon-name="utility:groups" 
+                            alternative-text="Experts" 
+                            size="x-small">
+                        </lightning-icon>
+                        <span>Expert Team</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cta-illustration">
+                <div class="illustration-circle circle-1"></div>
+                <div class="illustration-circle circle-2"></div>
+                <div class="illustration-circle circle-3"></div>
+                <div class="support-icon">
+                    <lightning-icon 
+                        icon-name="utility:custom_apps" 
+                        alternative-text="Support" 
+                        size="large">
+                    </lightning-icon>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,47 @@
+<template>
+    <div class="category-section">
+        <div class="section-header">
+            <h2 class="section-title">Browse by Product Category</h2>
+            <p class="section-subtitle">Find solutions specific to your product</p>
+        </div>
+
+        <div class="category-grid">
+            <template for:each={categories} for:item="category">
+                <div 
+                    key={category.id} 
+                    class="category-card"
+                    data-category={category.name}
+                    onclick={handleCategoryClick}
+                >
+                    <div class="card-header">
+                        <div class="icon-wrapper">
+                            <span class="category-emoji">{category.emoji}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h3 class="category-name">{category.name}</h3>
+                        <p class="category-description">{category.description}</p>
+                        <div class="category-stats">
+                            <lightning-icon 
+                                icon-name="utility:knowledge_base" 
+                                alternative-text="Articles" 
+                                size="x-small">
+                            </lightning-icon>
+                            <span class="article-count">{category.articles} articles</span>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <span class="view-link">
+                            View articles
+                            <lightning-icon 
+                                icon-name="utility:chevronright" 
+                                alternative-text="Arrow" 
+                                size="xx-small">
+                            </lightning-icon>
+                        </span>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,72 @@
+<template>
+    <div class="articles-section">
+        <div class="section-header">
+            <h2 class="section-title">Popular Help Articles</h2>
+            <p class="section-subtitle">Find quick answers to common questions</p>
+        </div>
+
+        <template if:true={isLoading}>
+            <div class="loading-container">
+                <lightning-spinner 
+                    alternative-text="Loading articles" 
+                    size="medium">
+                </lightning-spinner>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <div class="articles-grid">
+                <template for:each={articles} for:item="article">
+                    <div 
+                        key={article.Id} 
+                        class="article-card"
+                        data-id={article.Id}
+                        onclick={handleArticleClick}
+                    >
+                        <div class="article-icon">
+                            <lightning-icon 
+                                icon-name="utility:knowledge_base" 
+                                alternative-text="Article" 
+                                size="small">
+                            </lightning-icon>
+                        </div>
+                        <div class="article-content">
+                            <h3 class="article-title">{article.Title}</h3>
+                            <p class="article-summary">{article.Summary}</p>
+                            <div class="article-meta">
+                                <span class="article-number">{article.ArticleNumber}</span>
+                                <span class="divider">•</span>
+                                <span class="view-count">
+                                    <lightning-icon 
+                                        icon-name="utility:preview" 
+                                        alternative-text="Views" 
+                                        size="xx-small">
+                                    </lightning-icon>
+                                    {article.ViewCount} views
+                                </span>
+                            </div>
+                        </div>
+                        <div class="article-arrow">
+                            <lightning-icon 
+                                icon-name="utility:chevronright" 
+                                alternative-text="Read" 
+                                size="small">
+                            </lightning-icon>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="view-all-container">
+                <button class="view-all-button" onclick={viewAllArticles}>
+                    View All Articles
+                    <lightning-icon 
+                        icon-name="utility:forward" 
+                        alternative-text="Forward" 
+                        size="x-small">
+                    </lightning-icon>
+                </button>
+            </div>
+        </template>
+    </div>
+</template>
