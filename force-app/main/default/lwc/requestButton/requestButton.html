@@ -1,0 +1,59 @@
+<template>
+    <div class="request-cta-container">
+        <div class="cta-card">
+            <div class="icon-container">
+                <lightning-icon 
+                    icon-name="utility:help" 
+                    alternative-text="Help" 
+                    size="medium"
+                    class="help-icon">
+                </lightning-icon>
+            </div>
+            
+            <div class="cta-content">
+                <h3 class="cta-title">Still Need Help?</h3>
+                <p class="cta-description">
+                    Can't find what you're looking for? Our support team is ready to assist you. 
+                    Submit a request and we'll get back to you within 24 hours.
+                </p>
+                
+                <div class="cta-features">
+                    <div class="feature-item">
+                        <lightning-icon 
+                            icon-name="utility:clock" 
+                            alternative-text="Response Time" 
+                            size="xx-small">
+                        </lightning-icon>
+                        <span>24-hour response</span>
+                    </div>
+                    <div class="feature-item">
+                        <lightning-icon 
+                            icon-name="utility:user" 
+                            alternative-text="Expert Team" 
+                            size="xx-small">
+                        </lightning-icon>
+                        <span>Expert support team</span>
+                    </div>
+                    <div class="feature-item">
+                        <lightning-icon 
+                            icon-name="utility:shield" 
+                            alternative-text="Secure" 
+                            size="xx-small">
+                        </lightning-icon>
+                        <span>Secure & confidential</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="submit-request-button" onclick={navigateToRequestPage}>
+                Submit a Request
+                <lightning-icon 
+                    icon-name="utility:forward" 
+                    alternative-text="Forward" 
+                    size="x-small"
+                    class="button-icon">
+                </lightning-icon>
+            </button>
+        </div>
+    </div>
+</template>

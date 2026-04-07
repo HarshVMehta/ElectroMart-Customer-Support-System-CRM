@@ -6,11 +6,11 @@
         </div>
 
         <div class="category-grid">
-            <template for:each={categories} for:item="category">
+            <template for:each={displayCategories} for:item="category">
                 <div 
                     key={category.id} 
-                    class="category-card"
-                    data-category={category.name}
+                    class={category.cardClass}
+                    data-id={category.id}
                     onclick={handleCategoryClick}
                 >
                     <div class="card-header">
@@ -43,5 +43,129 @@
                 </div>
             </template>
         </div>
+
+        <template if:true={showCategoryArticlesSection}>
+            <section class="category-results-panel">
+                <header class="results-header">
+                    <div>
+                        <h3 class="results-title">{selectedCategoryHeading}</h3>
+                        <p class="results-subtitle">{sectionSubtitle}</p>
+                    </div>
+
+                    <div class="results-actions">
+                        <template if:true={hasCategoryArticles}>
+                            <span class="results-count">{categoryResultCountLabel}</span>
+                        </template>
+                        <button class="clear-results-btn" type="button" onclick={clearCategorySelection}>
+                            Back to Categories
+                        </button>
+                    </div>
+                </header>
+
+                <template if:true={isLoadingCategoryArticles}>
+                    <div class="results-state loading">
+                        <lightning-spinner alternative-text="Loading category articles" size="medium"></lightning-spinner>
+                        <p>Loading articles...</p>
+                    </div>
+                </template>
+
+                <template if:true={hasCategoryError}>
+                    <div class="results-state error">
+                        <p>{categoryError}</p>
+                    </div>
+                </template>
+
+                <template if:true={hasCategoryArticles}>
+                    <div class="article-results-grid">
+                        <template for:each={categoryArticles} for:item="article">
+                            <article
+                                key={article.Id}
+                                class="result-article-card"
+                                data-id={article.Id}
+                                onclick={handleArticleClick}
+                            >
+                                <div class="result-icon">
+                                    <lightning-icon
+                                        icon-name="utility:knowledge_base"
+                                        alternative-text="Article"
+                                        size="x-small"
+                                    ></lightning-icon>
+                                </div>
+
+                                <div class="result-content">
+                                    <h4>{article.Title}</h4>
+                                    <p>{article.safeSummary}</p>
+                                    <div class="result-meta">
+                                        <span>{article.ArticleNumber}</span>
+                                        <span class="dot">•</span>
+                                        <span>{article.ArticleTotalViewCount} views</span>
+                                    </div>
+                                </div>
+
+                                <div class="result-arrow">
+                                    <lightning-icon
+                                        icon-name="utility:chevronright"
+                                        alternative-text="Open"
+                                        size="xx-small"
+                                    ></lightning-icon>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                </template>
+
+                <template if:true={noCategoryArticlesFound}>
+                    <div class="results-state empty">
+                        <p>No articles found for this category.</p>
+                    </div>
+                </template>
+            </section>
+        </template>
+
+        <template if:true={isArticleModalOpen}>
+            <div class="article-modal-backdrop" onclick={handleModalBackdropClick}>
+                <section class="article-modal" role="dialog" aria-modal="true" aria-label="Knowledge article preview">
+                    <header class="article-modal-header">
+                        <div>
+                            <p class="modal-label">Article Preview</p>
+                            <h2>{selectedArticle.Title}</h2>
+                        </div>
+                        <button class="modal-close" type="button" onclick={closeArticleModal} aria-label="Close">
+                            ×
+                        </button>
+                    </header>
+
+                    <div class="article-modal-body">
+                        <template if:true={isArticleDetailLoading}>
+                            <div class="frame-loading">
+                                <lightning-spinner alternative-text="Loading article details" size="medium"></lightning-spinner>
+                                <p>Loading article details...</p>
+                            </div>
+                        </template>
+
+                        <template if:false={isArticleDetailLoading}>
+                            <div class="article-preview">
+                                <div class="article-preview-meta">
+                                    <span class="meta-chip">Article: {selectedArticleNumber}</span>
+                                    <span class="meta-chip">Views: {selectedArticleViews}</span>
+                                </div>
+
+                                <template if:true={hasArticleDetailError}>
+                                    <div class="preview-error">{articleDetailError}</div>
+                                </template>
+
+                                <div class="article-preview-content">
+                                    <lightning-formatted-rich-text value={selectedArticleBody}></lightning-formatted-rich-text>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <footer class="article-modal-footer">
+                        <button class="modal-btn secondary" type="button" onclick={closeArticleModal}>Close</button>
+                    </footer>
+                </section>
+            </div>
+        </template>
     </div>
 </template>

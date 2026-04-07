@@ -17,11 +17,64 @@
                         class="search-input"
                         placeholder="Search for help articles, troubleshooting guides..."
                         value={searchQuery}
-                        onkeyup={handleSearchInput}
-                        onkeypress={handleKeyPress}
+                        oninput={handleSearchInput}
+                        onkeydown={handleKeyPress}
                     />
                     <button class="search-button" onclick={handleSearch}>Search</button>
                 </div>
+
+                <template if:true={showResultsPanel}>
+                    <div class="results-panel">
+                        <template if:true={isSearching}>
+                            <div class="results-state loading">
+                                <lightning-spinner alternative-text="Searching" size="small"></lightning-spinner>
+                                <p>Searching knowledge articles...</p>
+                            </div>
+                        </template>
+
+                        <template if:true={hasSearchError}>
+                            <div class="results-state error">
+                                <p>{searchError}</p>
+                            </div>
+                        </template>
+
+                        <template if:true={hasResults}>
+                            <div class="results-header">
+                                <span>Matching articles</span>
+                                <span class="results-count">{searchResults.length}</span>
+                            </div>
+
+                            <div class="results-list">
+                                <template for:each={searchResults} for:item="article">
+                                    <button
+                                        key={article.Id}
+                                        class="result-item"
+                                        data-id={article.Id}
+                                        onclick={handleResultClick}
+                                        type="button"
+                                    >
+                                        <div class="result-main">
+                                            <h3>{article.Title}</h3>
+                                            <p>{article.safeSummary}</p>
+                                        </div>
+                                        <lightning-icon
+                                            icon-name="utility:chevronright"
+                                            alternative-text="Open"
+                                            size="xx-small"
+                                            class="result-arrow"
+                                        ></lightning-icon>
+                                    </button>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template if:true={showNoResults}>
+                            <div class="results-state empty">
+                                <p>No articles found. Try a different keyword.</p>
+                            </div>
+                        </template>
+                    </div>
+                </template>
             </div>
 
             <div class="cta-section">
@@ -35,5 +88,51 @@
         <div class="hero-background">
             <div class="wave-animation"></div>
         </div>
+
+        <template if:true={isArticleModalOpen}>
+            <div class="article-modal-backdrop" onclick={handleModalBackdropClick}>
+                <section class="article-modal" role="dialog" aria-modal="true" aria-label="Knowledge article preview">
+                    <header class="article-modal-header">
+                        <div>
+                            <p class="modal-label">Article Preview</p>
+                            <h2>{selectedArticle.Title}</h2>
+                        </div>
+                        <button class="modal-close" type="button" onclick={closeArticleModal} aria-label="Close">
+                            ×
+                        </button>
+                    </header>
+
+                    <div class="article-modal-body">
+                        <template if:true={isArticleDetailLoading}>
+                            <div class="frame-loading">
+                                <lightning-spinner alternative-text="Loading article details" size="medium"></lightning-spinner>
+                                <p>Loading article details...</p>
+                            </div>
+                        </template>
+
+                        <template if:false={isArticleDetailLoading}>
+                            <div class="article-preview">
+                                <div class="article-preview-meta">
+                                    <span class="meta-chip">Article: {selectedArticleNumber}</span>
+                                    <span class="meta-chip">Views: {selectedArticleViews}</span>
+                                </div>
+
+                                <template if:true={hasArticleDetailError}>
+                                    <div class="preview-error">{articleDetailError}</div>
+                                </template>
+
+                                <div class="article-preview-content">
+                                    <lightning-formatted-rich-text value={selectedArticleBody}></lightning-formatted-rich-text>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <footer class="article-modal-footer">
+                        <button class="modal-btn secondary" type="button" onclick={closeArticleModal}>Close</button>
+                    </footer>
+                </section>
+            </div>
+        </template>
     </div>
 </template>

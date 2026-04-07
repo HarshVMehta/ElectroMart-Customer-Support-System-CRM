@@ -1,0 +1,298 @@
+<template>
+    <div class="submit-request-page">
+        
+        <!-- Breadcrumb Navigation -->
+        <div class="breadcrumb-container">
+            <button class="back-button" onclick={navigateBack}>
+                <lightning-icon 
+                    icon-name="utility:back" 
+                    alternative-text="Back" 
+                    size="x-small">
+                </lightning-icon>
+                Back to Support
+            </button>
+        </div>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="header-icon">
+                <lightning-icon 
+                    icon-name="utility:edit_form" 
+                    alternative-text="Form" 
+                    size="large">
+                </lightning-icon>
+            </div>
+            <h1 class="page-title">Submit a Support Request</h1>
+            <p class="page-subtitle">
+                Tell us about your issue and we'll get back to you within 24 hours. 
+                All fields marked with <span class="required-indicator">*</span> are required.
+            </p>
+        </div>
+
+        <!-- Success Message -->
+        <template if:true={showSuccess}>
+            <div class="success-container">
+                <div class="success-card">
+                    <lightning-icon 
+                        icon-name="utility:success" 
+                        alternative-text="Success" 
+                        size="large"
+                        class="success-icon">
+                    </lightning-icon>
+                    <h2 class="success-title">Request Submitted Successfully!</h2>
+                    <p class="success-message">
+                        Your support request has been received. Our team will review it and respond within 24 hours.
+                    </p>
+                    <div class="case-info">
+                        <span class="case-label">Reference Number:</span>
+                        <span class="case-number">{caseNumber}</span>
+                    </div>
+                    <div class="success-actions">
+                        <button class="primary-action" onclick={navigateToMyCases}>
+                            View My Cases
+                        </button>
+                        <button class="secondary-action" onclick={navigateBack}>
+                            Back to Support
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Error Message -->
+        <template if:true={showError}>
+            <div class="error-banner">
+                <lightning-icon 
+                    icon-name="utility:error" 
+                    alternative-text="Error" 
+                    size="small">
+                </lightning-icon>
+                <span>{errorMessage}</span>
+            </div>
+        </template>
+
+        <!-- Request Form -->
+        <template if:false={showSuccess}>
+            <div class="form-container">
+                <form class="request-form" onsubmit={handleSubmit}>
+                    
+                    <!-- Section 1: Contact Information -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span class="section-number">1</span>
+                            Contact Information
+                        </h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="name" class="form-label">
+                                    Full Name <span class="required">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="name" 
+                                    name="name" 
+                                    class="form-input"
+                                    maxlength="80"
+                                    required
+                                    placeholder="Enter your full name"
+                                />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="email" class="form-label">
+                                    Email Address <span class="required">*</span>
+                                </label>
+                                <input 
+                                    type="email" 
+                                    id="email" 
+                                    name="email" 
+                                    class="form-input"
+                                    maxlength="80"
+                                    required
+                                    placeholder="your.email@example.com"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phone" class="form-label">
+                                Phone Number
+                            </label>
+                            <input 
+                                type="tel" 
+                                id="phone" 
+                                name="phone" 
+                                class="form-input"
+                                maxlength="40"
+                                placeholder="+1 (555) 000-0000"
+                            />
+                            <span class="field-hint">We'll only call if we need clarification</span>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Issue Details -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span class="section-number">2</span>
+                            Issue Details
+                        </h3>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="product" class="form-label">
+                                    Product Category <span class="required">*</span>
+                                </label>
+                                <select 
+                                    id="product" 
+                                    name="00NgK00003PIomY" 
+                                    class="form-select"
+                                    required
+                                >
+                                    <option value="">-- Select Product --</option>
+                                    <option value="Mobile">📱 Mobile</option>
+                                    <option value="Laptop">💻 Laptop</option>
+                                    <option value="Television">📺 Television</option>
+                                    <option value="Home Appliance">🏠 Home Appliance</option>
+                                    <option value="Warranty">🛡️ Warranty</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="issueCategory" class="form-label">
+                                    Issue Type <span class="required">*</span>
+                                </label>
+                                <select 
+                                    id="issueCategory" 
+                                    name="00NgK00003RuwzW" 
+                                    class="form-select"
+                                    required
+                                >
+                                    <option value="">-- Select Issue Type --</option>
+                                    <option value="Hardware Issue">Hardware Issue</option>
+                                    <option value="Software Issue">Software Issue</option>
+                                    <option value="Installation Issue">Installation Issue</option>
+                                    <option value="Warranty Claim">Warranty Claim</option>
+                                    <option value="Replacement Request">Replacement Request</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="priority" class="form-label">
+                                Priority Level <span class="required">*</span>
+                            </label>
+                            <div class="priority-selector">
+                                <label class="priority-option">
+                                    <input type="radio" name="priority" value="Low" required />
+                                    <span class="priority-badge priority-low">
+                                        <lightning-icon icon-name="utility:priority" size="xx-small"></lightning-icon>
+                                        Low
+                                    </span>
+                                    <span class="priority-desc">Response within 48 hours</span>
+                                </label>
+                                <label class="priority-option">
+                                    <input type="radio" name="priority" value="Medium" required />
+                                    <span class="priority-badge priority-medium">
+                                        <lightning-icon icon-name="utility:priority" size="xx-small"></lightning-icon>
+                                        Medium
+                                    </span>
+                                    <span class="priority-desc">Response within 24 hours</span>
+                                </label>
+                                <label class="priority-option">
+                                    <input type="radio" name="priority" value="High" required />
+                                    <span class="priority-badge priority-high">
+                                        <lightning-icon icon-name="utility:priority" size="xx-small"></lightning-icon>
+                                        High
+                                    </span>
+                                    <span class="priority-desc">Response within 4 hours</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Description -->
+                    <div class="form-section">
+                        <h3 class="section-title">
+                            <span class="section-number">3</span>
+                            Tell Us More
+                        </h3>
+
+                        <div class="form-group">
+                            <label for="subject" class="form-label">
+                                Subject <span class="required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="subject" 
+                                name="subject" 
+                                class="form-input"
+                                maxlength="80"
+                                required
+                                placeholder="Brief summary of your issue"
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description" class="form-label">
+                                Description <span class="required">*</span>
+                            </label>
+                            <textarea 
+                                id="description" 
+                                name="description" 
+                                class="form-textarea"
+                                rows="6"
+                                required
+                                placeholder="Please provide detailed information about your issue. Include any error messages, steps you've already tried, and when the problem started."
+                            ></textarea>
+                            <span class="field-hint">Be as specific as possible to help us resolve your issue faster</span>
+                        </div>
+                    </div>
+
+                    <!-- Hidden Fields -->
+                    <input type="hidden" name="orgid" value="00DgK00000Kt6in" />
+                    <input type="hidden" name="retURL" value="" />
+                    <input type="hidden" name="external" value="1" />
+
+                    <!-- Form Footer -->
+                    <div class="form-footer">
+                        <div class="footer-info">
+                            <lightning-icon 
+                                icon-name="utility:shield" 
+                                alternative-text="Secure" 
+                                size="x-small">
+                            </lightning-icon>
+                            <span>Your information is secure and confidential</span>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="cancel-button" onclick={handleCancel}>
+                                Cancel
+                            </button>
+                            <button type="submit" class="submit-button" disabled={isSubmitting}>
+                                <template if:false={isSubmitting}>
+                                    <lightning-icon 
+                                        icon-name="utility:check" 
+                                        size="x-small"
+                                        class="button-icon">
+                                    </lightning-icon>
+                                    Submit Request
+                                </template>
+                                <template if:true={isSubmitting}>
+                                    <lightning-spinner 
+                                        alternative-text="Submitting..." 
+                                        size="small">
+                                    </lightning-spinner>
+                                    Submitting...
+                                </template>
+                            </button>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+        </template>
+
+    </div>
+</template>
