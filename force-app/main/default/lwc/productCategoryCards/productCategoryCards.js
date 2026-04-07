@@ -2,6 +2,8 @@ import { LightningElement } from 'lwc';
 import getArticlesByCategory from '@salesforce/apex/KnowledgeController.getArticlesByCategory';
 import getArticleDetails from '@salesforce/apex/KnowledgeController.getArticleDetails';
 import getCategoryArticleCounts from '@salesforce/apex/KnowledgeController.getCategoryArticleCounts';
+import getArticleViewCounts from '@salesforce/apex/KnowledgeController.getArticleViewCounts';
+import recordArticleView from '@salesforce/apex/KnowledgeController.recordArticleView';
 
 const CATEGORY_RESULTS_LIMIT = 8;
 
@@ -71,23 +73,48 @@ export default class ProductCategoryCards extends LightningElement {
     isArticleDetailLoading = false;
     articleDetailError = '';
 
+    isResultsPanelOpen = false;
+    shouldFocusResultsPanel = false;
+
     connectedCallback() {
         this.loadCategoryCounts();
     }
 
+    renderedCallback() {
+        if (!this.shouldFocusResultsPanel || !this.showCategoryArticlesSection) {
+            return;
+        }
+
+        const heading = this.template.querySelector('.results-title-anchor');
+        if (heading) {
+            heading.focus();
+            this.shouldFocusResultsPanel = false;
+        }
+    }
+
     get displayCategories() {
         return this.categories.map((category) => {
+            const isActive = category.id === this.selectedCategoryId;
+            const isLoadingActive = isActive && this.isLoadingCategoryArticles;
+
             return {
                 ...category,
-                cardClass: category.id === this.selectedCategoryId
+                cardClass: isActive
                     ? 'category-card active'
-                    : 'category-card'
+                    : 'category-card',
+                viewLinkClass: isLoadingActive ? 'view-link loading' : 'view-link',
+                actionLabel: isLoadingActive
+                    ? 'Loading articles'
+                    : isActive
+                        ? 'Viewing now'
+                        : 'View articles',
+                showArrow: !isLoadingActive
             };
         });
     }
 
     get showCategoryArticlesSection() {
-        return Boolean(this.selectedCategoryId);
+        return this.isResultsPanelOpen && Boolean(this.selectedCategoryId);
     }
 
     get hasCategoryArticles() {
@@ -126,6 +153,14 @@ export default class ProductCategoryCards extends LightningElement {
         return `${count} article${count === 1 ? '' : 's'} found`;
     }
 
+    get resultPanelAriaLabel() {
+        if (!this.selectedCategoryName) {
+            return 'Category article results';
+        }
+
+        return `${this.selectedCategoryName} article results`;
+    }
+
     get selectedArticleSummary() {
         if (!this.selectedArticle) {
             return '';
@@ -155,7 +190,15 @@ export default class ProductCategoryCards extends LightningElement {
     }
 
     get selectedArticleViews() {
-        if (!this.selectedArticle || !this.selectedArticle.ArticleTotalViewCount) {
+        if (!this.selectedArticle) {
+            return 0;
+        }
+
+        if (typeof this.selectedArticle.ViewCount === 'number') {
+            return this.selectedArticle.ViewCount;
+        }
+
+        if (!this.selectedArticle.ArticleTotalViewCount) {
             return 0;
         }
 
@@ -176,6 +219,8 @@ export default class ProductCategoryCards extends LightningElement {
 
         this.selectedCategoryId = selectedCategory.id;
         this.selectedCategoryName = selectedCategory.name;
+        this.isResultsPanelOpen = true;
+        this.shouldFocusResultsPanel = true;
         this.categoryError = '';
         this.categoryArticles = [];
         this.isLoadingCategoryArticles = true;
@@ -186,12 +231,15 @@ export default class ProductCategoryCards extends LightningElement {
                 limitCount: CATEGORY_RESULTS_LIMIT
             });
 
-            this.categoryArticles = (results || []).map((article) => {
+            const normalizedResults = (results || []).map((article) => {
                 return {
                     ...article,
-                    safeSummary: article.Summary || 'No summary available yet.'
+                    safeSummary: article.Summary || 'No summary available yet.',
+                    ViewCount: 0
                 };
             });
+
+            this.categoryArticles = await this.attachCategoryArticleViewCounts(normalizedResults);
         } catch (error) {
             this.categoryError = this.extractErrorMessage(error);
             this.categoryArticles = [];
@@ -210,11 +258,14 @@ export default class ProductCategoryCards extends LightningElement {
 
         this.selectedArticle = {
             ...selected,
+            ViewCount: this.normalizeViewCount(selected.ViewCount),
             bodyContent: ''
         };
         this.isArticleModalOpen = true;
         this.isArticleDetailLoading = true;
         this.articleDetailError = '';
+
+        this.recordAndApplyViewCount(selected.Id);
 
         try {
             const details = await getArticleDetails({ articleVersionId: selected.Id });
@@ -230,6 +281,7 @@ export default class ProductCategoryCards extends LightningElement {
                     ArticleTotalViewCount: details.articleTotalViewCount !== null && details.articleTotalViewCount !== undefined
                         ? details.articleTotalViewCount
                         : this.selectedArticle.ArticleTotalViewCount,
+                    ViewCount: this.normalizeViewCount(this.selectedArticle.ViewCount),
                     bodyContent: details.body || ''
                 };
             }
@@ -253,7 +305,19 @@ export default class ProductCategoryCards extends LightningElement {
         }
     }
 
+    handleResultsBackdropClick(event) {
+        if (event.target.classList.contains('results-overlay-backdrop')) {
+            this.clearCategorySelection();
+        }
+    }
+
+    closeResultsPanel() {
+        this.clearCategorySelection();
+    }
+
     clearCategorySelection() {
+        this.isResultsPanelOpen = false;
+        this.shouldFocusResultsPanel = false;
         this.selectedCategoryId = '';
         this.selectedCategoryName = '';
         this.categoryArticles = [];
@@ -286,6 +350,70 @@ export default class ProductCategoryCards extends LightningElement {
                 articles: typeof value === 'number' ? value : category.articles
             };
         });
+    }
+
+    async attachCategoryArticleViewCounts(articles) {
+        const articleIds = (articles || [])
+            .map((article) => article.Id)
+            .filter((id) => Boolean(id));
+
+        if (!articleIds.length) {
+            return articles;
+        }
+
+        try {
+            const counts = await getArticleViewCounts({ articleVersionIds: articleIds });
+
+            return articles.map((article) => {
+                return {
+                    ...article,
+                    ViewCount: this.normalizeViewCount(counts ? counts[article.Id] : 0)
+                };
+            });
+        } catch (error) {
+            return articles;
+        }
+    }
+
+    async recordAndApplyViewCount(articleId) {
+        if (!articleId) {
+            return;
+        }
+
+        try {
+            const latestCount = await recordArticleView({ articleVersionId: articleId });
+            const normalizedCount = this.normalizeViewCount(latestCount);
+
+            this.categoryArticles = this.categoryArticles.map((article) => {
+                if (article.Id !== articleId) {
+                    return article;
+                }
+
+                return {
+                    ...article,
+                    ViewCount: normalizedCount
+                };
+            });
+
+            if (this.selectedArticle && this.selectedArticle.Id === articleId) {
+                this.selectedArticle = {
+                    ...this.selectedArticle,
+                    ViewCount: normalizedCount
+                };
+            }
+        } catch (error) {
+            // Do not block article preview when tracking update fails.
+        }
+    }
+
+    normalizeViewCount(value) {
+        const numericValue = Number(value);
+
+        if (!Number.isFinite(numericValue) || numericValue < 0) {
+            return 0;
+        }
+
+        return Math.floor(numericValue);
     }
 
     extractErrorMessage(error) {

@@ -15,57 +15,204 @@
         </template>
 
         <template if:false={isLoading}>
-            <div class="articles-grid">
-                <template for:each={articles} for:item="article">
-                    <div 
-                        key={article.Id} 
-                        class="article-card"
-                        data-id={article.Id}
-                        onclick={handleArticleClick}
-                    >
-                        <div class="article-icon">
-                            <lightning-icon 
-                                icon-name="utility:knowledge_base" 
-                                alternative-text="Article" 
-                                size="small">
-                            </lightning-icon>
-                        </div>
-                        <div class="article-content">
-                            <h3 class="article-title">{article.Title}</h3>
-                            <p class="article-summary">{article.Summary}</p>
-                            <div class="article-meta">
-                                <span class="article-number">{article.ArticleNumber}</span>
-                                <span class="divider">•</span>
-                                <span class="view-count">
+            <template if:true={hasError}>
+                <div class="error-state">
+                    <p>{error}</p>
+                </div>
+            </template>
+
+            <template if:false={hasError}>
+                <template if:true={hasArticles}>
+                    <div class="ranking-headline">
+                        <p class="ranking-summary">{rankingSummary}</p>
+                        <span class="live-status">{liveStatusText}</span>
+                    </div>
+
+                    <div class="articles-grid">
+                        <template for:each={articles} for:item="article">
+                            <button
+                                key={article.Id} 
+                                class="article-card"
+                                data-id={article.Id}
+                                onclick={handleArticleClick}
+                                type="button"
+                            >
+                                <span class={article.rankBadgeClass}>#{article.Rank}</span>
+
+                                <div class="article-icon">
                                     <lightning-icon 
-                                        icon-name="utility:preview" 
-                                        alternative-text="Views" 
-                                        size="xx-small">
+                                        icon-name="utility:knowledge_base" 
+                                        alternative-text="Article" 
+                                        size="small">
                                     </lightning-icon>
-                                    {article.ViewCount} views
-                                </span>
-                            </div>
-                        </div>
-                        <div class="article-arrow">
+                                </div>
+                                <div class="article-content">
+                                    <h3 class="article-title">{article.Title}</h3>
+                                    <p class="article-summary">{article.safeSummary}</p>
+                                    <div class="article-meta">
+                                        <span class="article-number">{article.ArticleNumber}</span>
+                                        <span class="divider">•</span>
+                                        <span class="view-count">
+                                            <lightning-icon 
+                                                icon-name="utility:preview" 
+                                                alternative-text="Views" 
+                                                size="xx-small">
+                                            </lightning-icon>
+                                            {article.ViewCount} views
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="article-arrow">
+                                    <lightning-icon 
+                                        icon-name="utility:chevronright" 
+                                        alternative-text="Preview" 
+                                        size="small">
+                                    </lightning-icon>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+
+                    <div class="view-all-container">
+                        <button class="view-all-button" type="button" onclick={viewAllArticles}>
+                            {viewAllButtonLabel}
                             <lightning-icon 
-                                icon-name="utility:chevronright" 
-                                alternative-text="Read" 
-                                size="small">
+                                icon-name="utility:forward" 
+                                alternative-text="Forward" 
+                                size="x-small">
                             </lightning-icon>
-                        </div>
+                        </button>
                     </div>
                 </template>
-            </div>
 
-            <div class="view-all-container">
-                <button class="view-all-button" onclick={viewAllArticles}>
-                    View All Articles
-                    <lightning-icon 
-                        icon-name="utility:forward" 
-                        alternative-text="Forward" 
-                        size="x-small">
-                    </lightning-icon>
-                </button>
+                <template if:false={hasArticles}>
+                    <div class="empty-state">
+                        <p>No published knowledge articles are available yet.</p>
+                    </div>
+                </template>
+            </template>
+        </template>
+
+        <template if:true={isAllPanelOpen}>
+            <div class="all-panel-shell">
+                <div class="all-panel-backdrop" onclick={handleAllPanelBackdropClick}></div>
+
+                <section class="all-panel" role="dialog" aria-modal="true" aria-label="All ranked popular articles">
+                    <header class="all-panel-header">
+                        <div>
+                            <p class="all-panel-label">Ranked Catalog</p>
+                            <h3>All Popular Articles</h3>
+                            <p class="all-panel-subtitle">{allPanelSummary}</p>
+                        </div>
+
+                        <button class="all-panel-close" type="button" onclick={closeAllPanel} aria-label="Close">
+                            ×
+                        </button>
+                    </header>
+
+                    <div class="all-panel-content">
+                        <template if:true={isAllPanelLoading}>
+                            <div class="all-panel-state loading">
+                                <lightning-spinner alternative-text="Loading all ranked articles" size="medium"></lightning-spinner>
+                                <p>Loading all ranked articles...</p>
+                            </div>
+                        </template>
+
+                        <template if:true={hasAllPanelError}>
+                            <div class="all-panel-state error">
+                                <p>{allPanelError}</p>
+                            </div>
+                        </template>
+
+                        <template if:true={hasAllArticles}>
+                            <div class="all-panel-list">
+                                <template for:each={allArticles} for:item="article">
+                                    <button
+                                        key={article.Id}
+                                        class="all-panel-item"
+                                        data-id={article.Id}
+                                        onclick={handleArticleClick}
+                                        type="button"
+                                    >
+                                        <span class="all-panel-rank">#{article.Rank}</span>
+
+                                        <div class="all-panel-main">
+                                            <h4>{article.Title}</h4>
+                                            <p>{article.safeSummary}</p>
+                                            <div class="all-panel-meta">
+                                                <span>{article.ArticleNumber}</span>
+                                                <span class="divider">•</span>
+                                                <span>{article.ViewCount} views</span>
+                                            </div>
+                                        </div>
+
+                                        <lightning-icon
+                                            icon-name="utility:chevronright"
+                                            alternative-text="Preview"
+                                            size="x-small"
+                                            class="all-panel-arrow"
+                                        ></lightning-icon>
+                                    </button>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template if:false={hasAllArticles}>
+                            <template if:false={isAllPanelLoading}>
+                                <div class="all-panel-state empty">
+                                    <p>No ranked articles are available right now.</p>
+                                </div>
+                            </template>
+                        </template>
+                    </div>
+                </section>
+            </div>
+        </template>
+
+        <template if:true={isArticleModalOpen}>
+            <div class="article-modal-backdrop" onclick={handleModalBackdropClick}>
+                <section class="article-modal" role="dialog" aria-modal="true" aria-label="Popular article preview">
+                    <header class="article-modal-header">
+                        <div>
+                            <p class="modal-label">Popular Article Preview</p>
+                            <h2>{selectedArticle.Title}</h2>
+                        </div>
+                        <button class="modal-close" type="button" onclick={closeArticleModal} aria-label="Close">
+                            ×
+                        </button>
+                    </header>
+
+                    <div class="article-modal-body">
+                        <template if:true={isArticleDetailLoading}>
+                            <div class="frame-loading">
+                                <lightning-spinner alternative-text="Loading article details" size="medium"></lightning-spinner>
+                                <p>Loading article details...</p>
+                            </div>
+                        </template>
+
+                        <template if:false={isArticleDetailLoading}>
+                            <div class="article-preview">
+                                <div class="article-preview-meta">
+                                    <span class="meta-chip">Rank: #{selectedArticleRank}</span>
+                                    <span class="meta-chip">Article: {selectedArticleNumber}</span>
+                                    <span class="meta-chip">Views: {selectedArticleViews}</span>
+                                </div>
+
+                                <template if:true={hasArticleDetailError}>
+                                    <div class="preview-error">{articleDetailError}</div>
+                                </template>
+
+                                <div class="article-preview-content">
+                                    <lightning-formatted-rich-text value={selectedArticleBody}></lightning-formatted-rich-text>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <footer class="article-modal-footer">
+                        <button class="modal-btn secondary" type="button" onclick={closeArticleModal}>Close</button>
+                    </footer>
+                </section>
             </div>
         </template>
     </div>

@@ -175,6 +175,19 @@
     overflow: hidden;
 }
 
+.result-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 7px;
+    font-size: 0.78rem;
+    color: #8d98ac;
+}
+
+.dot {
+    color: #c4ccdb;
+}
+
 .result-arrow {
     color: #9dacd5;
     margin-top: 3px;

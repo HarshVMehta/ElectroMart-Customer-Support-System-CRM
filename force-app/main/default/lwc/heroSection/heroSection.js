@@ -1,9 +1,13 @@
-import { LightningElement } from 'lwc';
+import { LightningElement, api } from 'lwc';
 import { NavigationMixin } from 'lightning/navigation';
 import searchArticles from '@salesforce/apex/KnowledgeController.searchArticles';
 import getArticleDetails from '@salesforce/apex/KnowledgeController.getArticleDetails';
+import getArticleViewCounts from '@salesforce/apex/KnowledgeController.getArticleViewCounts';
+import recordArticleView from '@salesforce/apex/KnowledgeController.recordArticleView';
 
 export default class HeroSection extends NavigationMixin(LightningElement) {
+    @api webToCasePath = '/case-form';
+
     searchQuery = '';
     searchResults = [];
     isSearching = false;
@@ -16,6 +20,7 @@ export default class HeroSection extends NavigationMixin(LightningElement) {
     articleDetailError = '';
 
     searchDebounceTimer;
+    activeSearchRequestId = 0;
 
     disconnectedCallback() {
         if (typeof window !== 'undefined') {
@@ -30,6 +35,7 @@ export default class HeroSection extends NavigationMixin(LightningElement) {
         this.searchError = '';
 
         if (normalizedQuery.length < 2) {
+            this.activeSearchRequestId += 1;
             this.searchResults = [];
             this.isSearching = false;
             this.showResultsPanel = false;
@@ -65,6 +71,8 @@ export default class HeroSection extends NavigationMixin(LightningElement) {
     }
 
     async fetchArticles(keyword) {
+        const requestId = this.activeSearchRequestId + 1;
+        this.activeSearchRequestId = requestId;
         this.isSearching = true;
         this.showResultsPanel = true;
         this.searchError = '';
@@ -75,17 +83,26 @@ export default class HeroSection extends NavigationMixin(LightningElement) {
                 limitCount: 6
             });
 
-            this.searchResults = (results || []).map((article) => {
+            if (requestId !== this.activeSearchRequestId) {
+                return;
+            }
+
+            const normalizedResults = (results || []).map((article) => {
                 return {
                     ...article,
-                    safeSummary: article.Summary || 'No summary available yet.'
+                    safeSummary: article.Summary || 'No summary available yet.',
+                    ViewCount: 0
                 };
             });
+
+            this.searchResults = await this.attachArticleViewCounts(normalizedResults);
         } catch (error) {
             this.searchResults = [];
             this.searchError = this.extractErrorMessage(error);
         } finally {
-            this.isSearching = false;
+            if (requestId === this.activeSearchRequestId) {
+                this.isSearching = false;
+            }
         }
     }
 
@@ -99,12 +116,15 @@ export default class HeroSection extends NavigationMixin(LightningElement) {
 
         this.selectedArticle = {
             ...selected,
+            ViewCount: this.normalizeViewCount(selected.ViewCount),
             bodyContent: ''
         };
         this.isArticleModalOpen = true;
         this.showResultsPanel = false;
         this.articleDetailError = '';
         this.isArticleDetailLoading = true;
+
+        this.recordAndApplyViewCount(selected.Id);
 
         try {
             const details = await getArticleDetails({ articleVersionId: selected.Id });
@@ -120,6 +140,7 @@ export default class HeroSection extends NavigationMixin(LightningElement) {
                     ArticleTotalViewCount: details.articleTotalViewCount !== null && details.articleTotalViewCount !== undefined
                         ? details.articleTotalViewCount
                         : this.selectedArticle.ArticleTotalViewCount,
+                    ViewCount: this.normalizeViewCount(this.selectedArticle.ViewCount),
                     bodyContent: details.body || ''
                 };
             }
@@ -192,7 +213,15 @@ export default class HeroSection extends NavigationMixin(LightningElement) {
     }
 
     get selectedArticleViews() {
-        if (!this.selectedArticle || !this.selectedArticle.ArticleTotalViewCount) {
+        if (!this.selectedArticle) {
+            return 0;
+        }
+
+        if (typeof this.selectedArticle.ViewCount === 'number') {
+            return this.selectedArticle.ViewCount;
+        }
+
+        if (!this.selectedArticle.ArticleTotalViewCount) {
             return 0;
         }
 
@@ -203,11 +232,75 @@ export default class HeroSection extends NavigationMixin(LightningElement) {
         return Boolean(this.articleDetailError);
     }
 
+    async attachArticleViewCounts(articles) {
+        const articleIds = (articles || [])
+            .map((article) => article.Id)
+            .filter((id) => Boolean(id));
+
+        if (!articleIds.length) {
+            return articles;
+        }
+
+        try {
+            const counts = await getArticleViewCounts({ articleVersionIds: articleIds });
+
+            return articles.map((article) => {
+                return {
+                    ...article,
+                    ViewCount: this.normalizeViewCount(counts ? counts[article.Id] : 0)
+                };
+            });
+        } catch (error) {
+            return articles;
+        }
+    }
+
+    async recordAndApplyViewCount(articleId) {
+        if (!articleId) {
+            return;
+        }
+
+        try {
+            const latestCount = await recordArticleView({ articleVersionId: articleId });
+            const normalizedCount = this.normalizeViewCount(latestCount);
+
+            this.searchResults = this.searchResults.map((article) => {
+                if (article.Id !== articleId) {
+                    return article;
+                }
+
+                return {
+                    ...article,
+                    ViewCount: normalizedCount
+                };
+            });
+
+            if (this.selectedArticle && this.selectedArticle.Id === articleId) {
+                this.selectedArticle = {
+                    ...this.selectedArticle,
+                    ViewCount: normalizedCount
+                };
+            }
+        } catch (error) {
+            // Do not block article preview when tracking update fails.
+        }
+    }
+
+    normalizeViewCount(value) {
+        const numericValue = Number(value);
+
+        if (!Number.isFinite(numericValue) || numericValue < 0) {
+            return 0;
+        }
+
+        return Math.floor(numericValue);
+    }
+
     navigateToSupport() {
         this[NavigationMixin.Navigate]({
-            type: 'standard__namedPage',
+            type: 'standard__webPage',
             attributes: {
-                pageName: 'support'
+                url: this.webToCasePath
             }
         });
     }

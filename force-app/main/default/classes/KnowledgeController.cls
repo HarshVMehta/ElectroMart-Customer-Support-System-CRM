@@ -9,6 +9,34 @@ public with sharing class KnowledgeController {
         @AuraEnabled public Integer articleTotalViewCount;
         @AuraEnabled public String body;
     }
+
+    public class PopularArticleRanking implements Comparable {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String title;
+        @AuraEnabled public String summary;
+        @AuraEnabled public String urlName;
+        @AuraEnabled public String articleNumber;
+        @AuraEnabled public Integer viewCount;
+        @AuraEnabled public Integer trackedViewCount;
+        @AuraEnabled public Integer rank;
+
+        public Integer compareTo(Object otherObject) {
+            PopularArticleRanking other = (PopularArticleRanking) otherObject;
+
+            Integer left = viewCount == null ? 0 : viewCount;
+            Integer right = other.viewCount == null ? 0 : other.viewCount;
+
+            if (left == right) {
+                String leftTitle = title == null ? '' : title.toLowerCase();
+                String rightTitle = other.title == null ? '' : other.title.toLowerCase();
+                return leftTitle.compareTo(rightTitle);
+            }
+
+            return left > right ? -1 : 1;
+        }
+    }
+
+    private static final String VIEW_STAT_DUPLICATE_VALUE = 'DUPLICATE_VALUE';
     
     /**
      * Get popular knowledge articles based on view count
@@ -37,6 +65,113 @@ public with sharing class KnowledgeController {
             
         } catch (Exception e) {
             throw new AuraHandledException('Error fetching articles: ' + e.getMessage());
+        }
+    }
+
+    /**
+     * Real-time ranking API for popular articles.
+     * Ranking score = Salesforce article views + tracked custom popup views.
+     * @param limitCount - Number of top articles to return. Null/0 returns all.
+     */
+    @AuraEnabled
+    public static List<PopularArticleRanking> getPopularArticleRankings(Integer limitCount) {
+        try {
+            List<Knowledge__kav> allOnlineArticles = [
+                SELECT Id, Title, Summary, UrlName, ArticleNumber, ArticleTotalViewCount
+                FROM Knowledge__kav
+                WHERE PublishStatus = 'Online'
+                AND Language = 'en_US'
+                ORDER BY ArticleTotalViewCount DESC NULLS LAST, Title ASC
+            ];
+
+            if (allOnlineArticles.isEmpty()) {
+                return new List<PopularArticleRanking>();
+            }
+
+            Set<String> articleVersionKeys = new Set<String>();
+            for (Knowledge__kav article : allOnlineArticles) {
+                articleVersionKeys.add(String.valueOf(article.Id));
+            }
+
+            Map<String, Integer> trackedViewsByArticleId;
+            try {
+                trackedViewsByArticleId = getTrackedViewCountsByArticleIds(articleVersionKeys);
+            } catch (Exception e) {
+                trackedViewsByArticleId = new Map<String, Integer>();
+            }
+
+            List<PopularArticleRanking> rankedArticles = new List<PopularArticleRanking>();
+            Boolean hasTrackedViewRows = !trackedViewsByArticleId.isEmpty();
+
+            if (!hasTrackedViewRows) {
+                Integer rowIndex = 1;
+                for (Knowledge__kav article : allOnlineArticles) {
+                    PopularArticleRanking ranked = new PopularArticleRanking();
+                    ranked.id = article.Id;
+                    ranked.title = article.Title;
+                    ranked.summary = article.Summary;
+                    ranked.urlName = article.UrlName;
+                    ranked.articleNumber = article.ArticleNumber;
+                    ranked.trackedViewCount = 0;
+                    ranked.viewCount = article.ArticleTotalViewCount == null
+                        ? 0
+                        : Integer.valueOf(article.ArticleTotalViewCount);
+                    ranked.rank = rowIndex;
+                    rankedArticles.add(ranked);
+
+                    if (limitCount != null && limitCount > 0 && rowIndex >= limitCount) {
+                        break;
+                    }
+
+                    rowIndex++;
+                }
+
+                return rankedArticles;
+            }
+
+            for (Knowledge__kav article : allOnlineArticles) {
+                String articleKey = String.valueOf(article.Id);
+                Integer nativeViews = article.ArticleTotalViewCount == null
+                    ? 0
+                    : Integer.valueOf(article.ArticleTotalViewCount);
+                Integer trackedViews = trackedViewsByArticleId.containsKey(articleKey)
+                    ? trackedViewsByArticleId.get(articleKey)
+                    : 0;
+
+                PopularArticleRanking ranked = new PopularArticleRanking();
+                ranked.id = article.Id;
+                ranked.title = article.Title;
+                ranked.summary = article.Summary;
+                ranked.urlName = article.UrlName;
+                ranked.articleNumber = article.ArticleNumber;
+                ranked.trackedViewCount = trackedViews;
+                ranked.viewCount = nativeViews + trackedViews;
+                rankedArticles.add(ranked);
+            }
+
+            rankedArticles.sort();
+
+            Integer assignedRank = 1;
+            for (PopularArticleRanking ranked : rankedArticles) {
+                ranked.rank = assignedRank;
+                assignedRank++;
+            }
+
+            if (limitCount != null && limitCount > 0 && rankedArticles.size() > limitCount) {
+                List<PopularArticleRanking> limitedRankedArticles = new List<PopularArticleRanking>();
+                Integer maxCount = Math.min(limitCount, rankedArticles.size());
+
+                for (Integer index = 0; index < maxCount; index++) {
+                    limitedRankedArticles.add(rankedArticles[index]);
+                }
+
+                return limitedRankedArticles;
+            }
+
+            return rankedArticles;
+
+        } catch (Exception e) {
+            throw new AuraHandledException('Error fetching ranked popular articles: ' + e.getMessage());
         }
     }
     
@@ -198,6 +333,62 @@ public with sharing class KnowledgeController {
     }
 
     /**
+     * Get tracked custom view counts for a set of article version Ids.
+     * Returns zero values when no tracking rows exist or access is unavailable.
+     */
+    @AuraEnabled
+    public static Map<String, Integer> getArticleViewCounts(List<Id> articleVersionIds) {
+        Map<String, Integer> countsByArticleId = new Map<String, Integer>();
+
+        if (articleVersionIds == null || articleVersionIds.isEmpty()) {
+            return countsByArticleId;
+        }
+
+        Set<String> articleVersionKeys = new Set<String>();
+        for (Id articleVersionId : articleVersionIds) {
+            if (articleVersionId == null) {
+                continue;
+            }
+
+            String key = String.valueOf(articleVersionId);
+            articleVersionKeys.add(key);
+            countsByArticleId.put(key, 0);
+        }
+
+        if (articleVersionKeys.isEmpty()) {
+            return countsByArticleId;
+        }
+
+        try {
+            Map<String, Integer> trackedCounts = getTrackedViewCountsByArticleIds(articleVersionKeys);
+            for (String articleKey : trackedCounts.keySet()) {
+                countsByArticleId.put(articleKey, trackedCounts.get(articleKey));
+            }
+        } catch (Exception e) {
+            // Keep zero defaults so article search/browse UX remains functional.
+        }
+
+        return countsByArticleId;
+    }
+
+    /**
+     * Increment tracked custom view count for an article version and return latest count.
+     * Returns null when tracking is unavailable, without interrupting article preview.
+     */
+    @AuraEnabled
+    public static Integer recordArticleView(Id articleVersionId) {
+        if (articleVersionId == null) {
+            return null;
+        }
+
+        try {
+            return incrementArticleViewCount(String.valueOf(articleVersionId));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Get a single article with richer content for modal preview
      * @param articleVersionId - Knowledge article version Id (Knowledge__kav Id)
      * @return Rich article detail data
@@ -245,6 +436,88 @@ public with sharing class KnowledgeController {
         } catch (Exception e) {
             throw new AuraHandledException('Error fetching article details: ' + e.getMessage());
         }
+    }
+
+    private static Integer incrementArticleViewCount(String articleVersionKey) {
+        List<Article_View_Stat__c> existingStats = [
+            SELECT Id, View_Count__c
+            FROM Article_View_Stat__c
+            WHERE Article_Version_Id__c = :articleVersionKey
+            LIMIT 1
+            FOR UPDATE
+        ];
+
+        if (!existingStats.isEmpty()) {
+            return updateExistingViewStat(existingStats[0]);
+        }
+
+        Article_View_Stat__c newStat = new Article_View_Stat__c(
+            Article_Version_Id__c = articleVersionKey,
+            View_Count__c = 1,
+            Last_Viewed_At__c = System.now()
+        );
+
+        try {
+            insert newStat;
+            return 1;
+        } catch (DmlException e) {
+            if (!e.getMessage().contains(VIEW_STAT_DUPLICATE_VALUE)) {
+                throw e;
+            }
+
+            List<Article_View_Stat__c> retryStats = [
+                SELECT Id, View_Count__c
+                FROM Article_View_Stat__c
+                WHERE Article_Version_Id__c = :articleVersionKey
+                LIMIT 1
+                FOR UPDATE
+            ];
+
+            if (retryStats.isEmpty()) {
+                return 1;
+            }
+
+            return updateExistingViewStat(retryStats[0]);
+        }
+    }
+
+    private static Integer updateExistingViewStat(Article_View_Stat__c statRecord) {
+        Integer currentCount = statRecord.View_Count__c == null
+            ? 0
+            : Integer.valueOf(statRecord.View_Count__c);
+
+        Integer nextCount = currentCount + 1;
+        statRecord.View_Count__c = nextCount;
+        statRecord.Last_Viewed_At__c = System.now();
+        update statRecord;
+
+        return nextCount;
+    }
+
+    private static Map<String, Integer> getTrackedViewCountsByArticleIds(Set<String> articleVersionKeys) {
+        Map<String, Integer> trackedCounts = new Map<String, Integer>();
+
+        if (articleVersionKeys == null || articleVersionKeys.isEmpty()) {
+            return trackedCounts;
+        }
+
+        for (Article_View_Stat__c stat : [
+            SELECT Article_Version_Id__c, View_Count__c
+            FROM Article_View_Stat__c
+            WHERE Article_Version_Id__c IN :articleVersionKeys
+        ]) {
+            if (String.isBlank(stat.Article_Version_Id__c)) {
+                continue;
+            }
+
+            Integer countValue = stat.View_Count__c == null
+                ? 0
+                : Integer.valueOf(stat.View_Count__c);
+
+            trackedCounts.put(stat.Article_Version_Id__c, countValue);
+        }
+
+        return trackedCounts;
     }
 
     private static List<String> resolveArticleContentFields(Map<String, Schema.SObjectField> fieldMap) {
