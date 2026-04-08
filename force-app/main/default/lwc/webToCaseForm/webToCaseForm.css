@@ -277,6 +277,12 @@
     font-weight: 700;
 }
 
+.optional-indicator {
+    color: #8a98ad;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
 .form-input,
 .form-textarea,
 .form-select {
@@ -342,6 +348,90 @@
     background-position: right 12px center;
     background-size: 18px;
     padding-right: 38px;
+}
+
+.form-file-input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 2px dashed #cfd9ee;
+    border-radius: 10px;
+    font-size: 0.92rem;
+    font-family: inherit;
+    background: #fafcff;
+    color: #455a78;
+    transition: all 0.24s ease;
+}
+
+.form-file-input:hover {
+    border-color: #aebee4;
+    background: #f6f9ff;
+}
+
+.form-file-input:focus {
+    outline: none;
+    border-color: var(--em-primary);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+.attachment-list {
+    margin-top: 10px;
+    display: grid;
+    gap: 8px;
+}
+
+.attachment-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #e2e7f2;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.attachment-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.attachment-name {
+    color: #2e3f57;
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-size {
+    color: #8795aa;
+    font-size: 0.76rem;
+}
+
+.remove-attachment-btn {
+    border: 1px solid #d9e0ef;
+    background: #f8faff;
+    color: #5067c6;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.remove-attachment-btn:hover:not(:disabled) {
+    background: #eef3ff;
+    border-color: #c4d0ec;
+}
+
+.remove-attachment-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
 }
 
 .field-error {
@@ -508,8 +598,10 @@
 .form-input:focus-visible,
 .form-textarea:focus-visible,
 .form-select:focus-visible,
+.form-file-input:focus-visible,
 .btn:focus-visible,
 .nav-pill:focus-visible,
+.remove-attachment-btn:focus-visible,
 .back-link:focus-visible {
     outline: 3px solid rgba(102, 126, 234, 0.55);
     outline-offset: 2px;

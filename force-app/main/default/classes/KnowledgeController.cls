@@ -70,18 +70,20 @@ public with sharing class KnowledgeController {
 
     /**
      * Real-time ranking API for popular articles.
-     * Ranking score = Salesforce article views + tracked custom popup views.
+     * Ranking score = tracked custom popup views only.
+     * This keeps view counts consistent with search/category modules,
+     * which also use tracked popup view counts.
      * @param limitCount - Number of top articles to return. Null/0 returns all.
      */
     @AuraEnabled
     public static List<PopularArticleRanking> getPopularArticleRankings(Integer limitCount) {
         try {
             List<Knowledge__kav> allOnlineArticles = [
-                SELECT Id, Title, Summary, UrlName, ArticleNumber, ArticleTotalViewCount
+                SELECT Id, Title, Summary, UrlName, ArticleNumber
                 FROM Knowledge__kav
                 WHERE PublishStatus = 'Online'
                 AND Language = 'en_US'
-                ORDER BY ArticleTotalViewCount DESC NULLS LAST, Title ASC
+                ORDER BY Title ASC
             ];
 
             if (allOnlineArticles.isEmpty()) {
@@ -101,39 +103,9 @@ public with sharing class KnowledgeController {
             }
 
             List<PopularArticleRanking> rankedArticles = new List<PopularArticleRanking>();
-            Boolean hasTrackedViewRows = !trackedViewsByArticleId.isEmpty();
-
-            if (!hasTrackedViewRows) {
-                Integer rowIndex = 1;
-                for (Knowledge__kav article : allOnlineArticles) {
-                    PopularArticleRanking ranked = new PopularArticleRanking();
-                    ranked.id = article.Id;
-                    ranked.title = article.Title;
-                    ranked.summary = article.Summary;
-                    ranked.urlName = article.UrlName;
-                    ranked.articleNumber = article.ArticleNumber;
-                    ranked.trackedViewCount = 0;
-                    ranked.viewCount = article.ArticleTotalViewCount == null
-                        ? 0
-                        : Integer.valueOf(article.ArticleTotalViewCount);
-                    ranked.rank = rowIndex;
-                    rankedArticles.add(ranked);
-
-                    if (limitCount != null && limitCount > 0 && rowIndex >= limitCount) {
-                        break;
-                    }
-
-                    rowIndex++;
-                }
-
-                return rankedArticles;
-            }
 
             for (Knowledge__kav article : allOnlineArticles) {
                 String articleKey = String.valueOf(article.Id);
-                Integer nativeViews = article.ArticleTotalViewCount == null
-                    ? 0
-                    : Integer.valueOf(article.ArticleTotalViewCount);
                 Integer trackedViews = trackedViewsByArticleId.containsKey(articleKey)
                     ? trackedViewsByArticleId.get(articleKey)
                     : 0;
@@ -145,7 +117,7 @@ public with sharing class KnowledgeController {
                 ranked.urlName = article.UrlName;
                 ranked.articleNumber = article.ArticleNumber;
                 ranked.trackedViewCount = trackedViews;
-                ranked.viewCount = nativeViews + trackedViews;
+                ranked.viewCount = trackedViews;
                 rankedArticles.add(ranked);
             }
 

@@ -3,6 +3,10 @@ import createCase from '@salesforce/apex/WebToCaseController.createCase';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
 
+const MAX_ATTACHMENTS = 3;
+const MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024;
+const MAX_TOTAL_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+
 export default class WebToCaseForm extends NavigationMixin(LightningElement) {
     // Form Fields
     name = '';
@@ -16,9 +20,17 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
     isLoading = false;
     // errors map drives inline messages; keys: name, email, subject, description, product, issueCategory
     errors = {};
-    // Inline success banner state
-    showInlineSuccess = false;
-    successMessage = '';
+
+    // Floating toast state
+    toastVisible = false;
+    toastTitle = '';
+    toastMessage = '';
+    toastVariant = 'info';
+
+    // Optional attachments
+    attachments = [];
+    attachmentError = '';
+    isReadingAttachments = false;
 
     // Validation Patterns
     emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -70,6 +82,130 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
     handleIssue(e) {
         this.issueCategory = e.target.value;
         this.validateIssueCategory();
+    }
+
+    /**
+     * Handle optional image attachments.
+     */
+    async handleAttachmentChange(event) {
+        const selectedFiles = Array.from(event.target.files || []);
+        this.attachmentError = '';
+
+        if (!selectedFiles.length) {
+            this.attachments = [];
+            return;
+        }
+
+        const validationMessage = this.validateAttachmentSelection(selectedFiles);
+        if (validationMessage) {
+            this.attachmentError = validationMessage;
+            this.attachments = [];
+            this.clearAttachmentInput();
+            return;
+        }
+
+        this.isReadingAttachments = true;
+
+        try {
+            const readResults = await Promise.all(
+                selectedFiles.map((file, index) => this.readAttachment(file, index))
+            );
+
+            this.attachments = readResults;
+        } catch (error) {
+            this.attachments = [];
+            this.attachmentError = 'Unable to process selected image files. Please try again.';
+            this.clearAttachmentInput();
+        } finally {
+            this.isReadingAttachments = false;
+        }
+    }
+
+    validateAttachmentSelection(files) {
+        if (files.length > MAX_ATTACHMENTS) {
+            return `You can upload up to ${MAX_ATTACHMENTS} images.`;
+        }
+
+        let totalBytes = 0;
+
+        for (const file of files) {
+            const fileType = (file.type || '').toLowerCase();
+            if (!fileType.startsWith('image/')) {
+                return 'Only image files are allowed.';
+            }
+
+            if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+                return `Each image must be ${this.formatFileSize(MAX_ATTACHMENT_SIZE_BYTES)} or smaller.`;
+            }
+
+            totalBytes += file.size;
+        }
+
+        if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+            return `Total attachment size must be ${this.formatFileSize(MAX_TOTAL_ATTACHMENT_BYTES)} or less.`;
+        }
+
+        return '';
+    }
+
+    readAttachment(file, index) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+
+            reader.onload = () => {
+                const result = typeof reader.result === 'string' ? reader.result : '';
+                const markerIndex = result.indexOf(',');
+
+                if (markerIndex === -1) {
+                    reject(new Error('Invalid file payload.'));
+                    return;
+                }
+
+                const base64Data = result.substring(markerIndex + 1);
+                resolve({
+                    id: `${Date.now()}-${index}`,
+                    fileName: file.name,
+                    contentType: file.type,
+                    base64Data,
+                    sizeBytes: file.size,
+                    sizeLabel: this.formatFileSize(file.size)
+                });
+            };
+
+            reader.onerror = () => {
+                reject(new Error('File read failed.'));
+            };
+
+            reader.readAsDataURL(file);
+        });
+    }
+
+    formatFileSize(bytes) {
+        if (bytes < 1024) {
+            return `${bytes} B`;
+        }
+
+        if (bytes < 1024 * 1024) {
+            return `${Math.round((bytes / 1024) * 10) / 10} KB`;
+        }
+
+        return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+    }
+
+    handleRemoveAttachment(event) {
+        const targetId = event.currentTarget.dataset.id;
+        this.attachments = this.attachments.filter((attachment) => attachment.id !== targetId);
+
+        if (!this.attachments.length) {
+            this.clearAttachmentInput();
+        }
+    }
+
+    clearAttachmentInput() {
+        const field = this.template.querySelector('[data-field="attachments"]');
+        if (field) {
+            field.value = '';
+        }
     }
 
     /**
@@ -310,6 +446,42 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
         return Object.keys(this.errors).length > 0;
     }
 
+    get hasAttachments() {
+        return this.attachments.length > 0;
+    }
+
+    get hasAttachmentError() {
+        return Boolean(this.attachmentError);
+    }
+
+    get toastClass() {
+        return `floating-toast ${this.toastVariant}`;
+    }
+
+    get toastSymbol() {
+        if (this.toastVariant === 'success') {
+            return '✓';
+        }
+
+        if (this.toastVariant === 'error') {
+            return '!';
+        }
+
+        if (this.toastVariant === 'warning') {
+            return '!';
+        }
+
+        return 'i';
+    }
+
+    get isSubmitDisabled() {
+        return this.isLoading || this.isReadingAttachments;
+    }
+
+    get attachmentHint() {
+        return `Optional: Upload up to ${MAX_ATTACHMENTS} images (${this.formatFileSize(MAX_ATTACHMENT_SIZE_BYTES)} each, ${this.formatFileSize(MAX_TOTAL_ATTACHMENT_BYTES)} total).`;
+    }
+
     /**
      * Computed getters for character counts
      */
@@ -381,6 +553,15 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
     handleSubmit() {
         console.log('[webToCaseForm] handleSubmit clicked');
 
+        if (this.isReadingAttachments) {
+            this.showToast(
+                'Please Wait',
+                'Attachment files are still being processed. Try submit again in a moment.',
+                'warning'
+            );
+            return;
+        }
+
         // Validate ALL fields
         const valid = this.validateAllFields();
         
@@ -398,6 +579,15 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
             return;
         }
 
+        if (this.attachmentError) {
+            this.showToast(
+                'Attachment Error',
+                this.attachmentError,
+                'error'
+            );
+            return;
+        }
+
         // All valid - proceed with submission
         this.isLoading = true;
 
@@ -407,7 +597,14 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
             subject: this.subject.trim(),
             description: this.description.trim(),
             product: this.product,
-            issueType: this.issueCategory
+            issueType: this.issueCategory,
+            attachmentsJson: JSON.stringify(this.attachments.map((attachment) => {
+                return {
+                    fileName: attachment.fileName,
+                    base64Data: attachment.base64Data,
+                    contentType: attachment.contentType
+                };
+            }))
         };
         
         console.log('[webToCaseForm] Calling Apex.createCase with payload:', JSON.parse(JSON.stringify(payload)));
@@ -416,26 +613,17 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
             .then(result => {
                 console.log('[webToCaseForm] Apex result:', result);
 
-                // Inline success banner (visible on page)
-                this.successMessage = `Your support request has been submitted successfully. Case ID: ${result}`;
-                this.showInlineSuccess = true;
+                const successMessage = `Your support request has been submitted successfully. Case ID: ${result}. Check your email for case details.`;
 
                 // Toast (still keep the toast for platform consistency)
                 this.showToast(
                     'Success!',
-                    this.successMessage,
+                    successMessage,
                     'success'
                 );
 
                 // Clear form fields
                 this.resetForm();
-
-                // Auto-hide banner after 6 seconds
-                window.clearTimeout(this._successTimer);
-                this._successTimer = window.setTimeout(() => {
-                    this.showInlineSuccess = false;
-                    this.successMessage = '';
-                }, 6000);
 
                 this.isLoading = false;
             })
@@ -454,8 +642,12 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
 
     disconnectedCallback() {
         if (typeof window !== 'undefined') {
-            window.clearTimeout(this._successTimer);
+            window.clearTimeout(this._toastTimer);
         }
+    }
+
+    closeToast() {
+        this.toastVisible = false;
     }
 
     /**
@@ -480,6 +672,18 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
                 variant
             })
         );
+
+        this.toastTitle = title;
+        this.toastMessage = message;
+        this.toastVariant = variant || 'info';
+        this.toastVisible = true;
+
+        if (typeof window !== 'undefined') {
+            window.clearTimeout(this._toastTimer);
+            this._toastTimer = window.setTimeout(() => {
+                this.toastVisible = false;
+            }, 5000);
+        }
     }
 
     /**
@@ -495,10 +699,12 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
         this.product = '';
         this.issueCategory = '';
         this.errors = {};
-        // Do not clear the success banner here; caller controls it (so success message stays visible)
+        this.attachments = [];
+        this.attachmentError = '';
+        this.isReadingAttachments = false;
 
         // Clear DOM values so UI reflects the reset instantly
-        ['name', 'email', 'subject', 'description', 'product', 'issueCategory'].forEach((fieldName) => {
+        ['name', 'email', 'subject', 'description', 'product', 'issueCategory', 'attachments'].forEach((fieldName) => {
             const field = this.template.querySelector(`[data-field="${fieldName}"]`);
             if (field) {
                 field.value = '';

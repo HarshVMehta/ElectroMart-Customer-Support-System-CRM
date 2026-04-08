@@ -233,12 +233,62 @@
                                 <div class="field-hint">Minimum 10 characters required</div>
                             </div>
 
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Attachments
+                                    <span class="optional-indicator">(Optional)</span>
+                                </label>
+                                <input
+                                    type="file"
+                                    data-field="attachments"
+                                    class="form-file-input"
+                                    accept="image/*"
+                                    multiple
+                                    onchange={handleAttachmentChange}
+                                    disabled={isLoading}
+                                />
+                                <div class="field-hint">{attachmentHint}</div>
+
+                                <template if:true={isReadingAttachments}>
+                                    <div class="field-hint">Reading selected files...</div>
+                                </template>
+
+                                <template if:true={hasAttachmentError}>
+                                    <div class="field-error">
+                                        <span class="error-icon">✕</span>
+                                        <span>{attachmentError}</span>
+                                    </div>
+                                </template>
+
+                                <template if:true={hasAttachments}>
+                                    <div class="attachment-list">
+                                        <template for:each={attachments} for:item="attachment">
+                                            <div key={attachment.id} class="attachment-item">
+                                                <div class="attachment-meta">
+                                                    <span class="attachment-name">{attachment.fileName}</span>
+                                                    <span class="attachment-size">{attachment.sizeLabel}</span>
+                                                </div>
+                                                <button
+                                                    class="remove-attachment-btn"
+                                                    type="button"
+                                                    data-id={attachment.id}
+                                                    onclick={handleRemoveAttachment}
+                                                    disabled={isLoading}
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+
                             <div class="buttons-container">
                                 <button
                                     class="btn btn-submit"
                                     type="button"
                                     onclick={handleSubmit}
-                                    disabled={isLoading}
+                                    disabled={isSubmitDisabled}
                                 >
                                     <template if:true={isLoading}>
                                         <div class="loading-spinner"></div>
@@ -252,7 +302,7 @@
                                     class="btn btn-reset"
                                     type="button"
                                     onclick={handleReset}
-                                    disabled={isLoading}
+                                    disabled={isSubmitDisabled}
                                 >
                                     Clear Form
                                 </button>

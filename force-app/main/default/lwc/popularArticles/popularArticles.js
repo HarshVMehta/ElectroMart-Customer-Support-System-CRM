@@ -286,10 +286,11 @@ export default class PopularArticles extends LightningElement {
 
     async recordViewForArticle(articleId, requestId) {
         try {
-            const latestCount = await recordArticleView({ articleVersionId: articleId });
-            const normalizedCount = this.normalizeViewCount(latestCount);
+            await recordArticleView({ articleVersionId: articleId });
 
-            this.applyUpdatedViewCount(articleId, normalizedCount, requestId);
+            // UI shows tracked popup views, so apply a +1 optimistic update locally.
+            // A background refresh reconciles final server order/counts.
+            this.applyIncrementedViewCount(articleId, requestId);
             this.loadTopArticles(false);
 
             if (this.isAllPanelOpen) {
@@ -324,25 +325,24 @@ export default class PopularArticles extends LightningElement {
         }
     }
 
-    applyUpdatedViewCount(articleId, latestCount, requestId) {
-        const countValue = this.normalizeViewCount(latestCount);
-
-        this.articles = this.updateRankedCollection(this.articles, articleId, countValue);
-        this.allArticles = this.updateRankedCollection(this.allArticles, articleId, countValue);
+    applyIncrementedViewCount(articleId, requestId) {
+        this.articles = this.updateRankedCollection(this.articles, articleId);
+        this.allArticles = this.updateRankedCollection(this.allArticles, articleId);
 
         if (requestId !== this.activeModalRequestId) {
             return;
         }
 
         if (this.selectedArticle && this.selectedArticle.Id === articleId) {
+            const currentCount = this.normalizeViewCount(this.selectedArticle.ViewCount);
             this.selectedArticle = {
                 ...this.selectedArticle,
-                ViewCount: countValue
+                ViewCount: currentCount + 1
             };
         }
     }
 
-    updateRankedCollection(collection, articleId, newCount) {
+    updateRankedCollection(collection, articleId) {
         if (!collection || !collection.length) {
             return collection;
         }
@@ -355,9 +355,11 @@ export default class PopularArticles extends LightningElement {
             }
 
             wasUpdated = true;
+            const currentCount = this.normalizeViewCount(article.ViewCount);
+
             return {
                 ...article,
-                ViewCount: newCount
+                ViewCount: currentCount + 1
             };
         });
 
@@ -371,8 +373,8 @@ export default class PopularArticles extends LightningElement {
                 return byViews;
             }
 
-            const leftTitle = left.Title || '';
-            const rightTitle = right.Title || '';
+            const leftTitle = (left.Title || '').toLowerCase();
+            const rightTitle = (right.Title || '').toLowerCase();
             return leftTitle.localeCompare(rightTitle);
         });
 
