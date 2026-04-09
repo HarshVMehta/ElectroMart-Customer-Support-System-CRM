@@ -1,0 +1,39 @@
+<template>
+    <header class="header-shell">
+        <div class="brand-zone">
+            <div class="brand-glyph" aria-hidden="true">
+                <span>EM</span>
+            </div>
+            <div class="brand-copy">
+                <p class="eyebrow">Customer Support Portal</p>
+                <h1>{brandName}</h1>
+            </div>
+        </div>
+
+        <button
+            class="menu-toggle"
+            type="button"
+            onclick={toggleMenu}
+            aria-label="Toggle navigation menu"
+        >
+            <lightning-icon icon-name="utility:rows" size="x-small"></lightning-icon>
+        </button>
+
+        <nav class={computedNavClass} aria-label="Global support navigation">
+            <template for:each={navItems} for:item="item">
+                <button
+                    key={item.key}
+                    class={item.className}
+                    type="button"
+                    data-key={item.key}
+                    data-path={item.path}
+                    onclick={handleNavigate}
+                    aria-current={item.ariaCurrent}
+                >
+                    <lightning-icon icon-name={item.icon} size="x-small" class="nav-icon"></lightning-icon>
+                    <span>{item.label}</span>
+                </button>
+            </template>
+        </nav>
+    </header>
+</template>

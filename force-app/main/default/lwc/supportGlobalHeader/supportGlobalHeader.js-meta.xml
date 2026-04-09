@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>66.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Support Global Header</masterLabel>
+    <description>Shared modern header for navigating between support pages.</description>
+    <targets>
+        <target>lightningCommunity__Page</target>
+        <target>lightningCommunity__Default</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightningCommunity__Default">
+            <property name="brandName" type="String" label="Brand Name" default="ElectroMart Support" description="Main heading shown on the header."/>
+            <property name="homePath" type="String" label="Home Path" default="/" description="Home page URL path from Experience Builder page settings."/>
+            <property name="homePageApiName" type="String" label="Home Page API Name" default="Home" description="Home page API Name from Experience Builder (for robust named-page navigation)."/>
+            <property name="caseFormPath" type="String" label="Case Form Path" default="/case-form" description="Case form page path or slug."/>
+            <property name="caseTrackingPath" type="String" label="Case Tracking Path" default="/case-tracking" description="Case tracking page path or slug."/>
+        </targetConfig>
+    </targetConfigs>
+</LightningComponentBundle>
