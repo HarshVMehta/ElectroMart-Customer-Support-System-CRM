@@ -613,14 +613,40 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
             .then(result => {
                 console.log('[webToCaseForm] Apex result:', result);
 
-                const successMessage = `Your support request has been submitted successfully. Case ID: ${result}. Check your email for case details.`;
+                const normalizedResult = this.normalizeCaseCreationResult(result);
+                const caseIdentifierText = normalizedResult.caseNumber
+                    ? `Case Number: ${normalizedResult.caseNumber}`
+                    : `Case ID: ${normalizedResult.caseId || 'N/A'}`;
 
-                // Toast (still keep the toast for platform consistency)
-                this.showToast(
-                    'Success!',
-                    successMessage,
-                    'success'
-                );
+                let toastTitle = 'Success!';
+                let toastVariant = 'success';
+                let toastMessage = `Your support request has been submitted successfully. ${caseIdentifierText}.`;
+
+                const warnings = [];
+
+                if (!normalizedResult.confirmationEmailSent) {
+                    warnings.push(
+                        normalizedResult.confirmationEmailMessage
+                            || 'Confirmation email could not be sent at this time.'
+                    );
+                }
+
+                if (!normalizedResult.attachmentsSaved) {
+                    warnings.push(
+                        normalizedResult.attachmentsMessage
+                            || 'Some attachments could not be saved.'
+                    );
+                }
+
+                if (warnings.length > 0) {
+                    toastTitle = 'Case Created with Warning';
+                    toastVariant = 'warning';
+                    toastMessage += ' ' + warnings.join(' ');
+                } else {
+                    toastMessage += ' Check your email for case details.';
+                }
+
+                this.showToast(toastTitle, toastMessage, toastVariant);
 
                 // Clear form fields
                 this.resetForm();
@@ -638,6 +664,30 @@ export default class WebToCaseForm extends NavigationMixin(LightningElement) {
                 this.showToast('Error', errorMessage, 'error');
                 this.isLoading = false;
             });
+    }
+
+    normalizeCaseCreationResult(result) {
+        if (typeof result === 'string') {
+            return {
+                caseId: result,
+                caseNumber: '',
+                confirmationEmailSent: true,
+                confirmationEmailMessage: '',
+                attachmentsSaved: true,
+                attachmentsMessage: ''
+            };
+        }
+
+        const safeResult = (result && typeof result === 'object') ? result : {};
+
+        return {
+            caseId: safeResult.caseId || '',
+            caseNumber: safeResult.caseNumber || '',
+            confirmationEmailSent: safeResult.confirmationEmailSent !== false,
+            confirmationEmailMessage: safeResult.confirmationEmailMessage || '',
+            attachmentsSaved: safeResult.attachmentsSaved !== false,
+            attachmentsMessage: safeResult.attachmentsMessage || ''
+        };
     }
 
     disconnectedCallback() {

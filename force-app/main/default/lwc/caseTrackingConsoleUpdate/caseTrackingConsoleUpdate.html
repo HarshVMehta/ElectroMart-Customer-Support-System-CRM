@@ -1,0 +1,63 @@
+<template>
+    <article class="tracking-console-card">
+        <header class="card-head">
+            <div>
+                <p class="eyebrow">Customer Tracking</p>
+                <h2>Case Update Flow</h2>
+                <p class="case-meta">
+                    <template if:true={caseNumber}>Case #{caseNumber}</template>
+                    <template if:false={caseNumber}>Case details</template>
+                </p>
+            </div>
+            <div class="publish-meta">
+                <span>Last Published</span>
+                <strong>{formattedLastPublished}</strong>
+            </div>
+        </header>
+
+        <div class="path-strip" role="list">
+            <template for:each={stageItems} for:item="stageItem">
+                <div key={stageItem.key} class="stage-wrap">
+                    <button
+                        class={stageItem.chipClass}
+                        type="button"
+                        data-stage={stageItem.label}
+                        aria-pressed={stageItem.ariaPressed}
+                        onclick={handleSelectStage}
+                    >
+                        <span class="stage-index">{stageItem.index}</span>
+                        <span class="stage-label">{stageItem.label}</span>
+                    </button>
+                    <template if:false={stageItem.isFinal}>
+                        <span class={stageItem.connectorClass}></span>
+                    </template>
+                </div>
+            </template>
+        </div>
+
+        <p class="selected-stage">{helperSummary}</p>
+
+        <div class="update-editor">
+            <label for="publicUpdateInput">Public update message for website tracking</label>
+            <textarea
+                id="publicUpdateInput"
+                data-field="publicUpdate"
+                class="update-input"
+                rows="4"
+                maxlength="5000"
+                oninput={handleUpdateTextChange}
+                placeholder="Example: Replacement request approved. Dispatch will be completed by tomorrow evening."
+            ></textarea>
+            <p class="help-text">This message is shown to customers in the tracking portal after OTP verification.</p>
+        </div>
+
+        <div class="actions">
+            <button class="btn secondary" type="button" onclick={handleReset} disabled={disableReset}>
+                Reset
+            </button>
+            <button class="btn primary" type="button" onclick={handlePublishUpdate} disabled={disablePublish}>
+                {publishButtonLabel}
+            </button>
+        </div>
+    </article>
+</template>

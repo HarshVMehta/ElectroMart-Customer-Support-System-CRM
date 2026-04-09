@@ -6,9 +6,29 @@ public with sharing class WebToCaseController {
         @AuraEnabled public String contentType;
     }
 
+    public class CaseCreationResult {
+        @AuraEnabled public Id caseId;
+        @AuraEnabled public String caseNumber;
+        @AuraEnabled public Boolean confirmationEmailSent;
+        @AuraEnabled public String confirmationEmailMessage;
+        @AuraEnabled public Boolean attachmentsSaved;
+        @AuraEnabled public String attachmentsMessage;
+    }
+
+    private class EmailDeliveryResult {
+        public Boolean success;
+        public String message;
+    }
+
     private static final Integer MAX_ATTACHMENTS = 3;
     private static final Integer MAX_ATTACHMENT_SIZE_BYTES = 2 * 1024 * 1024;
     private static final Integer MAX_TOTAL_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+
+    @TestVisible
+    private static Boolean forceConfirmationEmailFailureForTest = false;
+
+    @TestVisible
+    private static Boolean forceAttachmentFailureForTest = false;
 
     /**
      * Create a Support Case from Web-to-Case form submission
@@ -19,12 +39,12 @@ public with sharing class WebToCaseController {
      * @param product - Product category
      * @param issueType - Type of issue
         * @param attachmentsJson - Optional JSON array payload of image attachments
-     * @return Case ID of the created case
+         * @return Case creation response with delivery diagnostics
      */
     @AuraEnabled
-    public static Id createCase(String name, String email, String subject, 
-                                 String description, String product, String issueType,
-                               String attachmentsJson) {
+        public static CaseCreationResult createCase(String name, String email, String subject,
+                                                                                                String description, String product, String issueType,
+                                                                                                String attachmentsJson) {
         try {
             // Input Validation
             if (String.isBlank(name) || String.isBlank(email) || 
@@ -60,24 +80,43 @@ public with sharing class WebToCaseController {
             // Insert the case
             insert c;
 
+            CaseCreationResult response = new CaseCreationResult();
+            response.caseId = c.Id;
+            response.caseNumber = c.CaseNumber;
+            response.attachmentsSaved = true;
+            response.attachmentsMessage = 'No attachments uploaded.';
+            response.confirmationEmailSent = false;
+            response.confirmationEmailMessage = 'Confirmation email was not attempted.';
+
             List<AttachmentUploadRequest> attachments = parseAttachmentRequests(attachmentsJson);
+            if (!attachments.isEmpty()) {
+                response.attachmentsMessage = 'Attachments uploaded successfully.';
+            }
 
             // Save optional attachments to the case (best-effort, non-blocking)
             try {
+                if (Test.isRunningTest() && forceAttachmentFailureForTest) {
+                    throw new AuraHandledException('Forced attachment failure for coverage.');
+                }
+
                 saveCaseAttachments(c.Id, attachments);
             } catch (Exception attachmentEx) {
-                System.debug('Case created but attachment upload failed: ' + attachmentEx.getMessage());
+                response.attachmentsSaved = false;
+                response.attachmentsMessage = 'Attachments could not be saved. ' + safeExceptionMessage(attachmentEx);
+                System.debug('Case created but attachment upload failed: ' + safeExceptionMessage(attachmentEx));
             }
 
-            // Send confirmation email to customer (best-effort, non-blocking)
-            try {
-                sendCaseCreationEmail(c);
-            } catch (Exception emailEx) {
-                System.debug('Case created but confirmation email failed: ' + emailEx.getMessage());
+            // Send confirmation email to customer and return explicit outcome to the UI.
+            EmailDeliveryResult emailResult = sendCaseCreationEmail(c);
+            response.confirmationEmailSent = emailResult.success;
+            response.confirmationEmailMessage = emailResult.message;
+
+            if (String.isBlank(response.caseNumber)) {
+                response.caseNumber = composeCaseIdentifier(c.Id);
             }
 
             System.debug('Case created successfully with ID: ' + c.Id);
-            return c.Id;
+            return response;
 
         } catch (AuraHandledException e) {
             throw e;
@@ -257,22 +296,34 @@ public with sharing class WebToCaseController {
      * Sends a confirmation email to the supplied customer email after case creation.
      * Includes case identifiers that can be used for status tracking.
      */
-    private static void sendCaseCreationEmail(Case createdCase) {
+    private static EmailDeliveryResult sendCaseCreationEmail(Case createdCase) {
+        EmailDeliveryResult response = new EmailDeliveryResult();
+
+        if (Test.isRunningTest() && forceConfirmationEmailFailureForTest) {
+            response.success = false;
+            response.message = 'Forced confirmation email failure for coverage.';
+            return response;
+        }
+
         if (createdCase == null || String.isBlank(createdCase.SuppliedEmail)) {
-            return;
+            response.success = false;
+            response.message = 'No recipient email was available on the case.';
+            return response;
+        }
+
+        try {
+            Messaging.reserveSingleEmailCapacity(1);
+        } catch (Exception capacityEx) {
+            response.success = false;
+            response.message = 'Salesforce daily email limit has been reached. Please try again after reset.';
+            return response;
         }
 
         String customerName = String.isBlank(createdCase.SuppliedName) ? 'Customer' : createdCase.SuppliedName;
         String caseNumber = createdCase.CaseNumber;
 
         if (String.isBlank(caseNumber)) {
-            Case reloadedCase = [
-                SELECT Id, CaseNumber
-                FROM Case
-                WHERE Id = :createdCase.Id
-                LIMIT 1
-            ];
-            caseNumber = reloadedCase.CaseNumber;
+            caseNumber = composeCaseIdentifier(createdCase.Id);
         }
 
         String displayCaseNumber = String.isBlank(caseNumber) ? 'N/A' : caseNumber;
@@ -292,7 +343,63 @@ public with sharing class WebToCaseController {
 
         Messaging.SendEmailResult[] results = Messaging.sendEmail(new List<Messaging.SingleEmailMessage>{ mail }, false);
         if (results == null || results.isEmpty() || !results[0].isSuccess()) {
-            System.debug('Confirmation email could not be sent for case: ' + createdCase.Id);
+            response.success = false;
+            response.message = extractSendEmailError(results);
+            System.debug('Confirmation email could not be sent for case: ' + createdCase.Id + '. Reason: ' + response.message);
+            return response;
         }
+
+        response.success = true;
+        response.message = 'Confirmation email sent successfully.';
+        return response;
+    }
+
+    private static String composeCaseIdentifier(Id caseId) {
+        if (caseId == null) {
+            return null;
+        }
+
+        Case reloadedCase = [
+            SELECT Id, CaseNumber
+            FROM Case
+            WHERE Id = :caseId
+            LIMIT 1
+        ];
+
+        return reloadedCase.CaseNumber;
+    }
+
+    private static String extractSendEmailError(Messaging.SendEmailResult[] results) {
+        if (results == null || results.isEmpty() || results[0] == null) {
+            return 'Salesforce could not provide an email failure reason.';
+        }
+
+        Messaging.SendEmailResult firstResult = results[0];
+        if (firstResult.isSuccess()) {
+            return 'Email sent successfully.';
+        }
+
+        if (firstResult.getErrors() == null || firstResult.getErrors().isEmpty()) {
+            return 'Email delivery failed without a detailed reason.';
+        }
+
+        List<String> messages = new List<String>();
+        for (Messaging.SendEmailError sendError : firstResult.getErrors()) {
+            if (sendError != null && String.isNotBlank(sendError.getMessage())) {
+                messages.add(sendError.getMessage());
+            }
+        }
+
+        return messages.isEmpty()
+            ? 'Email delivery failed without a detailed reason.'
+            : String.join(messages, ' | ');
+    }
+
+    private static String safeExceptionMessage(Exception ex) {
+        if (ex == null || String.isBlank(ex.getMessage())) {
+            return 'Unexpected error occurred.';
+        }
+
+        return ex.getMessage();
     }
 }

@@ -1,0 +1,181 @@
+<template>
+    <section class="tracking-page">
+        <div class="bg-grid" aria-hidden="true"></div>
+        <div class="bg-blob blob-1" aria-hidden="true"></div>
+        <div class="bg-blob blob-2" aria-hidden="true"></div>
+
+        <div class="content-shell">
+            <header class="page-header">
+                <p class="eyebrow">ElectroMart Support</p>
+                <h1>Track Your Support Case</h1>
+                <p>
+                    Enter your Case Number or Case ID, verify with OTP, and view live updates through every stage.
+                </p>
+            </header>
+
+            <div class="step-track" role="presentation">
+                <span class={lookupStepClass}>1. Find Case</span>
+                <span class={verifyStepClass}>2. Verify OTP</span>
+                <span class={resultStepClass}>3. View Progress</span>
+            </div>
+
+            <article class="lookup-card">
+                <h2>Search by Case Number or Case ID</h2>
+                <div class="lookup-bar">
+                    <input
+                        class="lookup-input"
+                        type="text"
+                        placeholder="Example: 00001042 or 500xxxxxxxxxxxx"
+                        value={caseReference}
+                        oninput={handleCaseReferenceInput}
+                    />
+                    <button class="primary-btn" type="button" onclick={handleSendOtp} disabled={isRequestDisabled}>
+                        {requestButtonLabel}
+                    </button>
+                </div>
+                <p class="lookup-hint">
+                    We will send OTP to the email associated with that case.
+                </p>
+            </article>
+
+            <template if:true={showOtpPanel}>
+                <article class="otp-card">
+                    <h2>Email Verification</h2>
+                    <p>
+                        Enter the 6-digit OTP sent to <span class="masked-email">{maskedEmail}</span>
+                    </p>
+
+                    <div class="otp-row">
+                        <input
+                            class="otp-input"
+                            type="text"
+                            inputmode="numeric"
+                            maxlength="6"
+                            placeholder="Enter 6-digit OTP"
+                            value={otpCode}
+                            oninput={handleOtpInput}
+                        />
+                        <button class="primary-btn" type="button" onclick={handleVerifyOtp} disabled={isVerifyDisabled}>
+                            {verifyButtonLabel}
+                        </button>
+                    </div>
+
+                    <button class="text-btn" type="button" onclick={handleResendOtp} disabled={isResendDisabled}>
+                        {resendLabel}
+                    </button>
+                </article>
+            </template>
+
+            <template if:true={showResults}>
+                <section class="result-grid">
+                    <article class="summary-card">
+                        <div class="summary-top">
+                            <h2>Case Summary</h2>
+                            <span class={caseStatusPillClass}>{effectiveStageLabel}</span>
+                        </div>
+                        <div class="summary-list">
+                            <div class="summary-item">
+                                <span>Case Number</span>
+                                <strong>{tracking.caseNumber}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Case ID</span>
+                                <strong>{tracking.caseId}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Subject</span>
+                                <strong>{tracking.subject}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Current Stage</span>
+                                <strong>{effectiveStageLabel}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Priority</span>
+                                <strong>{tracking.priority}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Created</span>
+                                <strong>{formattedCreatedDate}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Last Updated</span>
+                                <strong>{formattedLastUpdatedDate}</strong>
+                            </div>
+                        </div>
+
+                        <button class="secondary-btn" type="button" onclick={handleTrackAnother}>
+                            Track Another Case
+                        </button>
+                    </article>
+
+                    <article class="pipeline-card">
+                        <h2>Progress Pipeline</h2>
+                        <div class="pipeline-list">
+                            <template for:each={stageItems} for:item="stage">
+                                <div key={stage.key} class="pipeline-item">
+                                    <div class="stage-rail">
+                                        <span class={stage.nodeClass}></span>
+                                        <template if:false={stage.isLast}>
+                                            <span class={stage.connectorClass}></span>
+                                        </template>
+                                    </div>
+                                    <div class="stage-content">
+                                        <h3>{stage.label}</h3>
+                                        <p>{stage.description}</p>
+                                        <span class="stage-time">{stage.formattedTimestamp}</span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </article>
+
+                    <article class="updates-card">
+                        <h2>Latest Updates</h2>
+
+                        <template if:true={hasPublicUpdate}>
+                            <article class="public-update-card">
+                                <div class="update-head">
+                                    <h3>Latest Support Message</h3>
+                                    <span>{formattedPublicUpdateTime}</span>
+                                </div>
+                                <p>{publicUpdateText}</p>
+                            </article>
+                        </template>
+
+                        <template if:true={hasUpdates}>
+                            <div class="updates-list">
+                                <template for:each={updateItems} for:item="updateRow">
+                                    <article key={updateRow.key} class={updateRow.cardClass}>
+                                        <div class="update-head">
+                                            <h3>{updateRow.title}</h3>
+                                            <span>{updateRow.formattedTimestamp}</span>
+                                        </div>
+                                        <p>{updateRow.message}</p>
+                                    </article>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template if:false={hasUpdates}>
+                            <p class="empty-state">No updates are available yet for this case.</p>
+                        </template>
+                    </article>
+                </section>
+            </template>
+        </div>
+
+        <template if:true={toastVisible}>
+            <div class={toastClass} role="status" aria-live="assertive">
+                <span class="toast-mark">{toastSymbol}</span>
+                <div class="toast-content">
+                    <p class="toast-title">{toastTitle}</p>
+                    <p class="toast-message">{toastMessage}</p>
+                </div>
+                <button class="toast-close" type="button" onclick={closeToast} aria-label="Close notification">
+                    ×
+                </button>
+            </div>
+        </template>
+    </section>
+</template>

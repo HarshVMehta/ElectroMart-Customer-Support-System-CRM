@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Tracking_Public_Stage__c</fullName>
+    <label>Tracking Public Stage</label>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Request Received</fullName>
+                <default>true</default>
+                <label>Request Received</label>
+            </value>
+            <value>
+                <fullName>Case Review Started</fullName>
+                <default>false</default>
+                <label>Case Review Started</label>
+            </value>
+            <value>
+                <fullName>Investigation in Progress</fullName>
+                <default>false</default>
+                <label>Investigation in Progress</label>
+            </value>
+            <value>
+                <fullName>Resolution in Progress</fullName>
+                <default>false</default>
+                <label>Resolution in Progress</label>
+            </value>
+            <value>
+                <fullName>Case Closed</fullName>
+                <default>false</default>
+                <label>Case Closed</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>
